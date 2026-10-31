@@ -33,7 +33,7 @@ h1{font-family:var(--f-display);font-weight:800;font-size:clamp(26px,5vw,38px);l
 .mtab small{font-family:var(--f-mono);font-weight:500;margin-left:6px;opacity:.75}
 .bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;position:sticky;top:env(safe-area-inset-top,0px);background:var(--bg);padding-block:10px;z-index:5}
 body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
-.tabs{display:flex;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:3px}
+.tabs{display:flex;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:22px;padding:3px}
 .tab{border:0;background:transparent;color:var(--muted);font:600 14px var(--f-body);padding:8px 14px;border-radius:999px;cursor:pointer;white-space:nowrap}
 .tab[aria-selected="true"]{background:var(--ink);color:var(--bg)}
 .tab small{font-family:var(--f-mono);font-weight:500;margin-left:6px;opacity:.75}
@@ -69,7 +69,9 @@ li.done .wa{background:var(--accent-soft);color:var(--accent)}
   .act{justify-content:flex-start}
   .stats{gap:14px}
   .mtab{padding:10px 8px;font-size:14px}
-  .tabs{border-radius:14px}
+  .tabs{flex-wrap:nowrap;overflow-x:auto;max-width:100%;border-radius:999px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  .tabs::-webkit-scrollbar{display:none}
+  .tab{flex:0 0 auto}
 }
 </style>
 
@@ -119,16 +121,13 @@ const UF={SP:"São Paulo",RJ:"Rio de Janeiro",ES:"Espírito Santo",MG:"Minas Ger
   DF:"Distrito Federal",GO:"Goiás",MT:"Mato Grosso",MS:"Mato Grosso do Sul",BA:"Bahia",SE:"Sergipe",AL:"Alagoas",PE:"Pernambuco",
   PB:"Paraíba",RN:"Rio Grande do Norte",CE:"Ceará",PI:"Piauí",MA:"Maranhão",PA:"Pará",AM:"Amazonas",AC:"Acre",RO:"Rondônia",
   RR:"Roraima",AP:"Amapá",TO:"Tocantins","??":"DDD desconhecido"};
-const REG={SP:"Sudeste",RJ:"Sudeste",ES:"Sudeste",MG:"Sudeste",PR:"Sul",SC:"Sul",RS:"Sul",DF:"Centro-Oeste",GO:"Centro-Oeste",
-  MT:"Centro-Oeste",MS:"Centro-Oeste",BA:"Nordeste",SE:"Nordeste",AL:"Nordeste",PE:"Nordeste",PB:"Nordeste",RN:"Nordeste",
-  CE:"Nordeste",PI:"Nordeste",MA:"Nordeste",PA:"Norte",AM:"Norte",AC:"Norte",RO:"Norte",RR:"Norte",AP:"Norte",TO:"Norte"};
-const REG_ORDER=["Sudeste","Sul","Centro-Oeste","Nordeste","Norte","Outros","Internacional"];
-const regOf=c=>c.uf==="INT"?"Internacional":(REG[c.uf]||"Outros");
+const stOf=c=>c.uf;
+const stName=k=>k==="INT"?"Internacional":(UF[k]||k);
 const grpOf=c=>c.uf==="INT"?"INT:"+c.p:c.ddd;
-const REG_COUNT={};CONT.forEach(c=>{const r=regOf(c);REG_COUNT[r]=(REG_COUNT[r]||0)+1});
-const REGIONS=REG_ORDER.filter(r=>REG_COUNT[r]);
+const ST_COUNT={};CONT.forEach(c=>{ST_COUNT[c.uf]=(ST_COUNT[c.uf]||0)+1});
+const STATES=Object.keys(ST_COUNT).sort((a,b)=>(a==="INT")-(b==="INT")||ST_COUNT[b]-ST_COUNT[a]||a.localeCompare(b));
 
-let view='clin', city='cwb', region='Todas';
+let view='clin', city='cwb', state='Todos';
 try{const v=localStorage.getItem(KEY_VIEW);if(v==='clin'||v==='cont')view=v}catch(e){}
 
 const fmt=t=>`(${t.slice(0,2)}) ${t.slice(2,7)}-${t.slice(7)}`;
@@ -143,8 +142,8 @@ function subTabs(){
     box.innerHTML=`<button class="tab" role="tab" data-c="cwb" aria-selected="${city==='cwb'}">Curitiba<small>${DATA.cwb.length}</small></button>`+
       `<button class="tab" role="tab" data-c="sp" aria-selected="${city==='sp'}">São Paulo<small>${DATA.sp.length}</small></button>`;
   }else{
-    box.innerHTML=[['Todas',CONT.length],...REGIONS.map(r=>[r,REG_COUNT[r]])]
-      .map(([r,n])=>`<button class="tab" role="tab" data-r="${esc(r)}" aria-selected="${region===r}">${esc(r)}<small>${n}</small></button>`).join('');
+    box.innerHTML=[['Todos',CONT.length],...STATES.map(k=>[k,ST_COUNT[k]])]
+      .map(([k,n])=>`<button class="tab" role="tab" data-s="${esc(k)}" title="${esc(k==='Todos'?'Todos os estados':stName(k))}" aria-selected="${state===k}">${esc(k==='INT'?'Internacional':k)}<small>${n}</small></button>`).join('');
   }
 }
 
@@ -163,8 +162,8 @@ function header(){
     $('q').placeholder='Buscar por nome ou bairro';
     $('note').textContent='Marque a caixinha ao lado de cada clínica depois de chamar. A marcação fica salva só neste navegador. Fonte: Google Maps, outubro de 2026.';
   }else{
-    $('title').innerHTML='Contatos diversos<br>por região';
-    $('subtitle').textContent='Separados por região e DDD, sem repetidos e sem os números que já estão nas clínicas.';
+    $('title').innerHTML='Contatos diversos<br>por estado';
+    $('subtitle').textContent='Separados por estado e DDD, sem repetidos e sem os números que já estão nas clínicas.';
     $('sTotal').textContent=CONT.length;
     $('sDone').textContent=CONT.filter(c=>doneC[c.d]).length;
     $('sDoneLbl').textContent='contatados';
@@ -193,7 +192,7 @@ function contFiltered(){
   const hide=$('hideDone').checked;
   const digits=/[a-zà-ú]/i.test(raw)?'':raw.replace(/\D/g,'');
   return CONT.filter(c=>{
-    if(region!=='Todas'&&regOf(c)!==region)return false;
+    if(state!=='Todos'&&c.uf!==state)return false;
     if(hide&&doneC[c.d])return false;
     if(!raw)return true;
     return (digits&&c.d.includes(digits))||(c.nm||'').toLowerCase().includes(raw)||(c.p||'').toLowerCase().includes(raw)||(UF[c.uf]||'').toLowerCase().includes(raw);
@@ -216,11 +215,11 @@ function renderCont(){
   const list=contFiltered();
   if(!list.length){$('list').innerHTML='<li class="empty" style="display:block">Nenhum contato encontrado.</li>';return}
   const regs=new Map();
-  list.forEach(c=>{const r=regOf(c),g=grpOf(c);if(!regs.has(r))regs.set(r,new Map());const m=regs.get(r);if(!m.has(g))m.set(g,[]);m.get(g).push(c)});
+  list.forEach(c=>{const r=stOf(c),g=grpOf(c);if(!regs.has(r))regs.set(r,new Map());const m=regs.get(r);if(!m.has(g))m.set(g,[]);m.get(g).push(c)});
   let i=0,out='';
-  REG_ORDER.filter(r=>regs.has(r)).forEach(r=>{
+  STATES.filter(r=>regs.has(r)).forEach(r=>{
     const m=regs.get(r);const all=[...m.values()].flat();
-    if(region==='Todas')out+=`<li class="reg"><b>${esc(r)}</b><span>${all.filter(c=>doneC[c.d]).length}/${all.length}</span></li>`;
+    if(state==='Todos')out+=`<li class="reg"><b>${esc(stName(r))}${r==='INT'?'':' · '+esc(r)}</b><span>${all.filter(c=>doneC[c.d]).length}/${all.length}</span></li>`;
     [...m.keys()].sort((a,b)=>a.localeCompare(b,'pt',{numeric:true})).forEach(g=>{
       const grp=m.get(g),c0=grp[0];
       const label=c0.uf==="INT"?esc(c0.p):`DDD ${esc(g)}`;
@@ -234,7 +233,7 @@ function renderCont(){
   $('list').innerHTML=out;
 }
 
-function render(){header();subTabs();view==='clin'?renderClin():renderCont()}
+function render(){header();subTabs();view==='clin'?renderClin():renderCont();const sel=$('sub').querySelector('[aria-selected="true"]');if(sel&&$('sub').scrollWidth>$('sub').clientWidth)$('sub').scrollLeft=sel.offsetLeft-$('sub').clientWidth/2+sel.offsetWidth/2}
 
 document.querySelectorAll('.mtab').forEach(b=>b.onclick=()=>{
   view=b.dataset.v;try{localStorage.setItem(KEY_VIEW,view)}catch(e){}
@@ -243,7 +242,7 @@ document.querySelectorAll('.mtab').forEach(b=>b.onclick=()=>{
 $('sub').addEventListener('click',e=>{
   const b=e.target.closest('.tab');if(!b)return;
   if(b.dataset.c)city=b.dataset.c;
-  if(b.dataset.r)region=b.dataset.r;
+  if(b.dataset.s)state=b.dataset.s;
   render();
 });
 let qt;$('q').oninput=()=>{clearTimeout(qt);qt=setTimeout(render,120)};
